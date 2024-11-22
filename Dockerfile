@@ -15,4 +15,6 @@ FROM alpine:latest
 
 COPY --from=builder /app/build/wos /app/build/wos
 
+WORKDIR /app/build/
+
 CMD ["./wos"]
