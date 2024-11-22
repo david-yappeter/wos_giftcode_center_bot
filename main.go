@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -34,14 +34,64 @@ func main() {
 		if update.Message != nil { // If we got a message
 			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-			resp := requestGiftCode("212587672", update.Message.Text)
+			playerIds := []string{
+				"212587672",
+				"233689177",
+				"234052235",
+			}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, resp)
+			maps := map[string]interface{}{}
+
+			for _, playerId := range playerIds {
+				requestPlayerAcc(playerId)
+				resp := requestGiftCode(playerId, update.Message.Text)
+				maps[playerId] = resp
+			}
+
+			j, _ := json.MarshalIndent(maps, " ", "  ")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%+v\n", string(j)))
 			msg.ReplyToMessageID = update.Message.MessageID
 
 			bot.Send(msg)
 		}
 	}
+}
+
+func requestPlayerAcc(playerId string) string {
+	const secret = "tB87#kPtkxqOS2"
+	var currentTime = time.Now().UTC().UnixMilli()
+
+	param := url.Values{}
+	param.Set("fid", playerId)
+	param.Set("time", fmt.Sprintf("%d", currentTime))
+	param.Set("sign", GetMD5Hash(fmt.Sprintf("fid=%s&time=%d%s", playerId, currentTime, secret)))
+
+	// fmt.Printf("ASD %s")
+
+	payload := bytes.NewBufferString(param.Encode())
+
+	request, err := http.NewRequest(http.MethodPost, "https://wos-giftcode-api.centurygame.com/api/player", payload)
+	if err != nil {
+		// handle error
+	}
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		// handle error
+	}
+
+	defer response.Body.Close()
+
+	var data interface{}
+	err = json.NewDecoder(response.Body).Decode(&data)
+	if err != nil {
+		// handle error
+	}
+
+	return fmt.Sprintf("%+v", data)
 }
 
 func requestGiftCode(playerId string, giftCode string) string {
